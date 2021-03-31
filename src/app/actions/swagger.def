@@ -1,0 +1,296 @@
+/**
+ * @swagger
+ *
+ * definitions:
+ *
+ *   Asset:
+ *     type: object
+ *     properties:
+ *       componentSerialNumbers:
+ *         type: array
+ *         items:
+ *           type: string
+ *       creationDate:
+ *         type: string
+ *       manufacturer:
+ *         type: string
+ *       partNameManufacturer:
+ *         type: string
+ *       partNumberCustomer:
+ *         type: string
+ *       partNumberManufacturer:
+ *         type: string
+ *       productionCountryCodeManufacturer:
+ *         type: string
+ *       productionDateGmt:
+ *         type: string
+ *       serialNumberType:
+ *         type: string
+ *       manufacturerLine:
+ *         type: string
+ *       manufacturerPlant:
+ *         type: string
+ *       customFields:
+ *         type: object
+ *       qualityDocuments:
+ *         type: object
+ *       qualityStatus:
+ *         type: string
+ *       serialNumberCustomer:
+ *         type: string
+ *       serialNumberManufacturer:
+ *         type: string
+ *       status:
+ *         type: string
+ *
+ *   AssetList:
+ *     type: object
+ *     properties:
+ *       asset:
+ *         type: array
+ *         items:
+ *           $ref: '#/definitions/Asset'
+ *
+ *   AssetResponse:
+ *     type: object
+ *     properties:
+ *       data:
+ *         type: array
+ *         items:
+ *           $ref: '#/definitions/Asset'
+ *       status:
+ *         type: number
+ *       resultLength:
+ *         type: number
+ *   AssetWithParent:
+ *     type: object
+ *     properties:
+ *       componentSerialNumbers:
+ *         type: array
+ *         items:
+ *           type: string
+ *       creationDate:
+ *         type: string
+ *       manufacturer:
+ *         type: string
+ *       partNameManufacturer:
+ *         type: string
+ *       partNumberCustomer:
+ *         type: string
+ *       partNumberManufacturer:
+ *         type: string
+ *       productionCountryCodeManufacturer:
+ *         type: string
+ *       productionDateGmt:
+ *         type: string
+ *       serialNumberType:
+ *         type: string
+ *       manufacturerLine:
+ *         type: string
+ *       manufacturerPlant:
+ *         type: string
+ *       customFields:
+ *         type: object
+ *       qualityDocuments:
+ *         type: object
+ *       qualityStatus:
+ *         type: string
+ *       serialNumberCustomer:
+ *         type: string
+ *       serialNumberManufacturer:
+ *         type: string
+ *       status:
+ *         type: string
+ *       parent:
+ *         type: object
+ *
+ *   AssetWithParentResponse:
+ *     type: object
+ *     properties:
+ *       data:
+ *         type: object
+ *         $ref: '#/definitions/AssetWithParent'
+ *
+ *   AssetListResponse:
+ *     type: object
+ *     properties:
+ *       data:
+ *         type: array
+ *         items:
+ *            $ref: '#/definitions/Asset'
+ *
+ *
+ *   Filter:
+ *     type: object
+ *     properties:
+ *       manufacturer:
+ *         type: string
+ *       partNameNumber:
+ *         type: string
+ *       productionCountryCode:
+ *         type: string
+ *       productionDateFrom:
+ *         type: string
+ *       productionDateTo:
+ *         type: string
+ *       qualityStatus:
+ *         type: string
+ *       serialNumberManufacturer:
+ *         type: string
+ *       type:
+ *         type: string
+ *   FilterSerialNumber:
+ *     type: object
+ *     properties:
+ *       serialNumberManufacturer:
+ *         type: string
+ *
+ *   Transaction:
+ *     type: object
+ *     properties:
+ *       description:
+ *         type: string
+ *       id:
+ *         type: string
+ *       propertyName:
+ *         type: string
+ *       propertyNewValue:
+ *         type: string
+ *       propertyOldValue:
+ *         type: string
+ *       serialNumberCustomer:
+ *         type: string
+ *       status:
+ *         type: string
+ *       timestampChanged:
+ *         type: string
+ *       timestampCreated:
+ *         type: string
+ *       userId:
+ *         type: string
+ *
+ *   TransactionList:
+ *     type: array
+ *     items:
+ *       $ref: '#/definitions/Transaction'
+ *
+ *   TransactionInput:
+ *     type: object
+ *     properties:
+ *       serialNumberCustomer:
+ *         type: string
+ *       propertyName:
+ *         type: string
+ *       propertyOldValue:
+ *         type: string
+ *       propertyNewValue:
+ *         type: string
+ *
+ *   TransactionListInput:
+ *     type: array
+ *     items:
+ *       $ref: '#/definitions/TransactionInput'
+ *
+ *   Tiles:
+ *     type: object
+ *     properties:
+ *       assetsCount:
+ *         type: integer
+ *       componentsCount:
+ *         type: integer
+ *       transactionsCount:
+ *         type: integer
+ *       vehiclesCount:
+ *         type: integer
+ *
+ *   KpiStatsResponse:
+ *     type: object
+ *     properties:
+ *       data:
+ *         type: object
+ *         properties:
+ *           assetsCount:
+ *             type: integer
+ *           vehiclesCount:
+ *             type: integer
+ *           assetsPerDay:
+ *             type: object
+ *           qualityStatusRatio:
+ *             type: object
+ *           AssetsCountPerCountryAndSupplier:
+ *             type: object
+ *
+ *   ACL:
+ *     type: object
+ *     properties:
+ *       ACL:
+ *         type: object
+ *         properties:
+ *           supplierAsupplierB:
+ *             type: object
+ *             properties:
+ *               entities:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               comment:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *               timestamp:
+ *                 type: string
+ *               changedBy:
+ *                 type: string
+ *               history:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *       owner:
+ *         type: string
+ *   ACLUpdateRequest:
+ *     type: object
+ *     properties:
+ *       targetOrg:
+ *         type: string
+ *       comment:
+ *         type: string
+ *
+ *   Investigation:
+ *     type: object
+ *     properties:
+ *       creator:
+ *         type: string
+ *       comment:
+ *         type: string
+ *       investigationID:
+ *         type: string
+ *       message:
+ *         type: string
+ *       status:
+ *         type: string
+ *       entities:
+ *         type: array
+ *         items:
+ *           type: string
+ *       participatingOrgs:
+ *         type: object
+ *         properties:
+ *           orgMSP:
+ *             type: object
+ *             properties:
+ *               componentsSerialNumbers:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               mspID:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *               timestamp:
+ *                 type: string
+ *
+ *   InvestigationArray:
+ *     type: array
+ *     items:
+ *       $ref: '#/definitions/TransactionInput'
+ */
