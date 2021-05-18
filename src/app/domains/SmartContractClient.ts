@@ -32,6 +32,8 @@ import validateAssetList, {AssetList, Asset} from "../modules/asset-validator/As
 import _ = require("lodash");
 
 
+
+
 /**
  * Smart contract client class
  * @class SmartContractClient
@@ -213,6 +215,7 @@ export default class SmartContractClient extends Gateway {
                 case "enrollOrg":
                 case "createRequest":
                 case "createInvestigation":
+                case "closeInvestigation":
                 case "updateOrgInvestigationStatus":
                 case "addSerialNumberCustomer":
                 case "decryptDataForInvestigation":
@@ -327,8 +330,7 @@ export default class SmartContractClient extends Gateway {
 
     }
 
-
-    /**
+  /**
      * Store asset Smart Contract
      * @async
      * @param asset
@@ -493,6 +495,14 @@ export default class SmartContractClient extends Gateway {
             if (mspIDFromJWT == ownerCheck.data.mspID) {
                 // Merge both child component arrays, since we do not allow the deletion of children right now
                 singleAsset.componentsSerialNumbers = [...new Set([...singleAsset.componentsSerialNumbers, ...ownerCheck.data.componentsSerialNumbers])];
+
+                const newDate = new Date(singleAsset.productionDateGmt);
+                if(newDate.getHours() == 0 && newDate.getMinutes() == 0 && newDate.getSeconds() == 0 && newDate.getMilliseconds() == 0){
+                    Logger.warn(`[${mspIDFromJWT}] productionDateGmt of ${singleAsset.serialNumberCustomer} is ${singleAsset.productionDateGmt},
+                                 which is currently not allowed, hence we are not updating the current productionDateGmt ${ownerCheck.data.productionDateGmt}!`);
+                    singleAsset.productionDateGmt = ownerCheck.data.productionDateGmt;
+                }
+
                 ownAssets.push(singleAsset);
             } else {
                 foreignAssets.push(singleAsset);

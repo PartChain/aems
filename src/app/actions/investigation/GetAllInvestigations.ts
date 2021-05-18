@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-import JWT from './../../modules/jwt/JWT';
-import Response from '../../modules/response/Response';
+import JWT from "./../../modules/jwt/JWT";
+import Response from "../../modules/response/Response";
 import InvestigationClient from "../../domains/InvestigationClient";
 
 /**
@@ -26,21 +26,15 @@ import InvestigationClient from "../../domains/InvestigationClient";
  * @constructor
  */
 export default async function GetAllInvestigations(req: any, res: any, next: any) {
-    const client = new InvestigationClient();
-    const jwt = JWT.parseFromHeader(
-        req.header('Authorization')
-    );
+	const client = new InvestigationClient();
+	const jwt = JWT.parseFromHeader(req.header("Authorization"));
 
-    await client.getAllInvestigations(
-        JWT.parseMspIDFromToken(jwt)
-    ).then(
-        (response: any) => {
-
-            Response.json(res, response, 200);
-        }
-    ).catch(
-        (error: any) => Response.json(res, Response.errorPayload(error), Response.errorStatusCode(error))
-    );
+	await client
+		.getAllInvestigations(JWT.parseMspIDFromToken(jwt))
+		.then((response: any) => {
+			Response.json(res, response, 200);
+		})
+		.catch((error: any) => Response.json(res, Response.errorPayload(error), Response.errorStatusCode(error)));
 }
 /**
  * @ignore
@@ -60,5 +54,5 @@ export default async function GetAllInvestigations(req: any, res: any, next: any
  *         content:
  *           application/json:
  *             schema:
- *            #   $ref: '#/definitions/InvestigationArray'
+ *               $ref: '#/definitions/InvestigationArray'
  */

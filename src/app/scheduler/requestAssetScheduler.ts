@@ -45,8 +45,7 @@ export default async function createRequestAssetScheduler() {
             const mspIDfromJWT = hlfIdentities[identity]["HLF_IDENTITY_MSP_ID"];
 
             Logger.debug(`[${mspIDfromJWT}] Scheduler: Fetching the components with status ${RelationshipStatusType.notInFabric} `);
-            // Order by random to not always try the some relations?
-            let notInFabricRelationships: any = await offChainDBClient.getRelationshipsByTransferStatus(RelationshipStatusType.notInFabric, mspIDfromJWT, defaults.cronjob.status.notInFabric.limit, true);
+            let notInFabricRelationships: any = await offChainDBClient.getRelationshipsNotInFabric(mspIDfromJWT, defaults.cronjob.status.notInFabric.limit);
 
             Logger.debug(`[${mspIDfromJWT}] List of assets with status ${RelationshipStatusType.notInFabric}: ${JSON.stringify(notInFabricRelationships)} `);
             Logger.info(`[${mspIDfromJWT}] Scheduler: ${notInFabricRelationships.length}  Assets with status ${RelationshipStatusType.notInFabric} (maximum: ${defaults.cronjob.status.notInFabric.limit})`);

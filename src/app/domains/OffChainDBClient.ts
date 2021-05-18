@@ -17,7 +17,6 @@
 import SQLClient from '../modules/sql-client/SQLClient';
 import Objects from '../modules/mapper/Objects';
 import Strings from '../modules/mapper/Strings';
-import {difference, omit} from 'lodash';
 import Logger from "../modules/logger/Logger";
 import AssetModel, {getAssetModelDefinition} from "../models/Asset";
 import RelationshipModel from "../models/Relationship";
@@ -25,12 +24,14 @@ import InvestigationModel from "../models/Investigation";
 import InvestigationRelationshipModel from "../models/InvestigationRelationship";
 import env from "../defaults";
 import RichQuerySQL from "../modules/rich-query-sql/RichQuerySQL";
-import {Sequelize} from "sequelize";
 import Iterable from "../modules/iterable/Iterable";
 import TransactionClient from "./TransactionClient";
 import Transaction from "../interfaces/Transaction";
 import {Asset} from "../modules/asset-validator/AssetValidator";
+import {RelationshipStatusType} from "../enums/RelationshipStatusType";
 import _ = require("lodash");
+import {Sequelize} from "sequelize";
+
 
 
 /**
@@ -289,7 +290,7 @@ export default class OffChainDBClient extends SQLClient {
                 // first find getObjectDifference to see what we need to update
                 const keysToOmit = _.difference(Object.keys(partUpdated), Object.keys(await getAssetModelDefinition(AssetModel)));
                 Logger.debug(`Key to omit: ${keysToOmit.toString()}`);
-                const diff: any = _.fromPairs(_.differenceWith(_.toPairs(omit(partUpdated, keysToOmit)), _.toPairs(assetToUpdate.get({plain: true})), _.isEqual));
+                const diff: any = _.fromPairs(_.differenceWith(_.toPairs(_.omit(partUpdated, keysToOmit)), _.toPairs(assetToUpdate.get({plain: true})), _.isEqual));
 
                 if (diff.hasOwnProperty("production_date_gmt") && new Date(diff.production_date_gmt).getTime() === new Date(partUpdated.production_date_gmt).getTime()) {
                     // Date in fabric can be 2020-11-25T10:39:33.000Z while being 2020-11-25 10:39:33.000000 in postgres
@@ -328,8 +329,8 @@ export default class OffChainDBClient extends SQLClient {
                 const componentsSerialNumbersInDB = relationshipRows.map((a: any) => a.child_serial_number_customer);
 
                 // Get getObjectDifference between db and assetToUpdate
-                const notInAsset = difference(componentsSerialNumbersInDB, partUpdated['components_serial_numbers']);
-                const notInDB = difference(partUpdated['components_serial_numbers'], componentsSerialNumbersInDB);
+                const notInAsset = _.difference(componentsSerialNumbersInDB, partUpdated['components_serial_numbers']);
+                const notInDB = _.difference(partUpdated['components_serial_numbers'], componentsSerialNumbersInDB);
 
                 Logger.info(`[${mspIDFromJWT}] Relationship not in Asset: ${notInAsset}`);
                 Logger.info(`[${mspIDFromJWT}] Relationship not in PostgreSQL version of Asset: ${notInDB}`);
@@ -637,7 +638,7 @@ export default class OffChainDBClient extends SQLClient {
      * @param limit
      * @param orderRandom: Boolean whether you want to get the relationships in a random order
      */
-    async getRelationshipsByTransferStatus(transferStatus: number | Array<number>, mspIDFromJWT: string, limit: Number = 100, orderRandom: boolean = false) {
+    async getRelationshipsByTransferStatus(transferStatus: number | Array<number>, mspIDFromJWT: string, limit: number = 100, orderRandom: boolean = false) {
         Logger.debug(`[${mspIDFromJWT}] getAssetByTransferStatus in OffChainDBClient with status ${transferStatus}, limit ${limit} and orderRandom ${orderRandom}`);
 
         const connectionPool = await this.connectAndSync(mspIDFromJWT);
@@ -656,6 +657,82 @@ export default class OffChainDBClient extends SQLClient {
         const queryString = `SELECT * FROM relationships ${whereCondition.whereConditionString} ${orderRandom ? "ORDER BY random()" : ""} LIMIT ${limit}`;
         Logger.debug(`[${mspIDFromJWT}] Executing query: ${queryString}`);
         return connectionPool.pool.query(queryString, this.createRawQueryOptionsWithReplacement(whereCondition.replacements));
+
+    }
+
+
+
+    /**
+     * Return all relationships in status NotInFabric with a sophisticated logic: New relationships we will get queried more often than older relationships.
+     * For every query the result will consist of 3 parts: new, medium old and old relationships. New relationships will be queried more often then old ones.
+     *
+     * @param mspIDFromJWT
+     * @param limit
+     */
+    async getRelationshipsNotInFabric(mspIDFromJWT: string, limit: number = 100) {
+        Logger.debug(`[${mspIDFromJWT}] getRelationshipsNotInFabric in OffChainDBClient with status limit ${limit}`);
+
+        let desiredCountNewRelationships = Math.ceil(limit * env.cronjob.status.notInFabric.newRelationships.limitPercentage);
+        let desiredCountMediumRelationships = Math.ceil(limit * env.cronjob.status.notInFabric.mediumRelationships.limitPercentage);
+        let desiredCountOldRelationships = Math.ceil(limit * env.cronjob.status.notInFabric.oldRelationships.limitPercentage);
+
+        const connectionPool = await this.connectAndSync(mspIDFromJWT);
+
+        const filter = {
+            "selector": {
+                "transfer_status": {
+                    "whereClause": " IN (:transfer_status) ",
+                    "replacement": {
+                        "transfer_status": Iterable.create(RelationshipStatusType.notInFabric)
+                    }
+                },
+                "retries": {
+                    "whereClause": " >= :min_retries AND retries < :max_retries ",
+                    "replacement": {
+                        "max_retries": env.cronjob.status.notInFabric.newRelationships.maxRetries,
+                        "min_retries": env.cronjob.status.notInFabric.newRelationships.minRetries
+                    }
+                },
+                "last_retry": {
+                    "whereClause": " < NOW() - INTERVAL ':days days' ",
+                    "replacement": {
+                        "days": env.cronjob.status.notInFabric.newRelationships.retryPeriodInDays
+                    }
+                }
+            }
+        };
+
+
+        let whereCondition = await this.buildWhereCondition(filter);
+        let queryString = `SELECT * FROM relationships ${whereCondition.whereConditionString} ORDER BY "updatedAt" LIMIT ${desiredCountNewRelationships}`;
+        Logger.debug(`[${mspIDFromJWT}] Executing query for newestRelationshipsNotInFabric: ${queryString}`);
+        const newRelationshipsNotInFabric = await connectionPool.pool.query(queryString, this.createRawQueryOptionsWithReplacement(whereCondition.replacements));
+
+        // In case the length of newRelationshipsNotInFabric is less then our desired count we add this contingent to desiredCountMediumRelationships
+        desiredCountMediumRelationships += desiredCountNewRelationships - newRelationshipsNotInFabric.length;
+        filter.selector.last_retry.replacement.days = env.cronjob.status.notInFabric.mediumRelationships.retryPeriodInDays;
+        filter.selector.retries.replacement.min_retries = env.cronjob.status.notInFabric.mediumRelationships.minRetries;
+        filter.selector.retries.replacement.max_retries = env.cronjob.status.notInFabric.mediumRelationships.maxRetries;
+        whereCondition = await this.buildWhereCondition(filter);
+        queryString = `SELECT * FROM relationships ${whereCondition.whereConditionString} ORDER BY "updatedAt" LIMIT ${desiredCountMediumRelationships}`;
+        Logger.debug(`[${mspIDFromJWT}] Executing query for mediumRelationshipsNotInFabric: ${queryString}`);
+        const mediumRelationshipsNotInFabric = await connectionPool.pool.query(queryString, this.createRawQueryOptionsWithReplacement(whereCondition.replacements));
+
+
+        // In case the length of mediumRelationshipsNotInFabric is less then our desired count we add this contingent to desiredCountOldRelationships
+        desiredCountOldRelationships += desiredCountMediumRelationships - mediumRelationshipsNotInFabric.length;
+        filter.selector.last_retry.replacement.days = env.cronjob.status.notInFabric.oldRelationships.retryPeriodInDays;
+        filter.selector.retries.whereClause = " >= :min_retries "
+        filter.selector.retries.replacement.min_retries = env.cronjob.status.notInFabric.oldRelationships.minRetries;
+        delete filter.selector.retries.replacement.max_retries;
+        whereCondition = await this.buildWhereCondition(filter);
+        queryString = `SELECT * FROM relationships ${whereCondition.whereConditionString} ORDER BY "updatedAt" LIMIT ${desiredCountOldRelationships}`;
+        Logger.debug(`[${mspIDFromJWT}] Executing query for oldRelationshipsNotInFabric: ${queryString}`);
+        const oldRelationshipsNotInFabric = await connectionPool.pool.query(queryString, this.createRawQueryOptionsWithReplacement(whereCondition.replacements));
+
+        Logger.info(`[${mspIDFromJWT}] Got ${newRelationshipsNotInFabric.length} newRelationshipsNotInFabric (desiredCount ${desiredCountNewRelationships}), ${mediumRelationshipsNotInFabric.length} mediumRelationshipsNotInFabric (desiredCount ${desiredCountMediumRelationships}) and ${oldRelationshipsNotInFabric.length} oldRelationshipsNotInFabric (desiredCount ${desiredCountOldRelationships})`);
+
+        return [...newRelationshipsNotInFabric, ...mediumRelationshipsNotInFabric, ...oldRelationshipsNotInFabric];
 
     }
 
@@ -933,20 +1010,11 @@ export default class OffChainDBClient extends SQLClient {
 
         const connectionPool = await this.connectAndSync(mspIDFromJWT);
 
-        const relationshipToUpdate = await connectionPool.relationshipModel.findAll({where: {"child_serial_number_customer": childSerialNumberCustomer}});
-
-        if (relationshipToUpdate === null || relationshipToUpdate.length < 1) {
-            Logger.info(`[${mspIDFromJWT}] There is nothing to update since relationship was not found: ${JSON.stringify(relationshipToUpdate)}`);
-        } else {
-            for (let i in relationshipToUpdate) {
-                relationshipToUpdate[i].transfer_status = transferStatus;
-                relationshipToUpdate[i].retries = relationshipToUpdate[i].retries + 1;
-                relationshipToUpdate[i].last_retry = new Date().toString();
-                relationshipToUpdate[i].child_mspid = childMspID;
-                await relationshipToUpdate[i].save();
-            };
-
-        }
+        await connectionPool.relationshipModel.update({ retries: Sequelize.literal('retries + 1'),
+                transfer_status: transferStatus,
+                child_mspid: childMspID,
+                last_retry: new Date().toString()},
+            {where: {"child_serial_number_customer": childSerialNumberCustomer}});
 
     }
 
@@ -962,19 +1030,10 @@ export default class OffChainDBClient extends SQLClient {
 
         const connectionPool = await this.connectAndSync(mspIDFromJWT);
 
-        const relationshipToUpdate = await connectionPool.relationshipModel.findAll({where: {"child_serial_number_customer": childSerialNumberCustomer}});
-
-        if (relationshipToUpdate === null || relationshipToUpdate.length < 1) {
-            Logger.info(`There is nothing to update since relationship was not found ${JSON.stringify(relationshipToUpdate)}`);
-        } else {
-            for (let i in relationshipToUpdate) {
-                relationshipToUpdate[i].transfer_status = transferStatus;
-                relationshipToUpdate[i].retries = relationshipToUpdate[i].retries + 1;
-                relationshipToUpdate[i].last_retry = new Date().toString();
-                await relationshipToUpdate[i].save();
-            };
-        }
-
+        await connectionPool.relationshipModel.update({ retries: Sequelize.literal('retries + 1'),
+                                                        transfer_status: transferStatus,
+                                                        last_retry: new Date().toString()},
+            {where: {"child_serial_number_customer": childSerialNumberCustomer}});
     }
 
     /**

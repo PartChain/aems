@@ -17,60 +17,67 @@
 import route, { getRouteOptions } from "../modules/route/route";
 import CreateInvestigation from "../actions/investigation/CreateInvestigation";
 import GetAllInvestigations from "../actions/investigation/GetAllInvestigations";
-import AddOrganisationToInvestigation from '../actions/investigation/AddOrganisationToInvestigation'
-import RejectInvestigation from '../actions/investigation/RejectInvestigation'
-import AcceptInvestigation from '../actions/investigation/AcceptInvestigation'
-import GetPublicInvestigationDetails from '../actions/investigation/GetPublicInvestigationDetails'
-import AddSerialNumberCustomerToInvestigation from '../actions/investigation/AddSerialNumberCustomer'
+import AddOrganisationToInvestigation from "../actions/investigation/AddOrganisationToInvestigation";
+import RejectInvestigation from "../actions/investigation/RejectInvestigation";
+import AcceptInvestigation from "../actions/investigation/AcceptInvestigation";
+import GetPublicInvestigationDetails from "../actions/investigation/GetPublicInvestigationDetails";
+import AddSerialNumberCustomerToInvestigation from "../actions/investigation/AddSerialNumberCustomer";
+import CloseInvestigation from "../actions/investigation/CloseInvestigation";
 
 /**
- * create an Investigation
+ * Create an Investigation
  */
-const createInvestigation = route('create-investigation', CreateInvestigation, getRouteOptions("post"));
+const createInvestigation = route("create-investigation", CreateInvestigation, getRouteOptions("post"));
 
 /**
- * add org to an Investigation
+ * Close an Investigation
  */
-const addOrgToInvestigation = route('add-org-investigation', AddOrganisationToInvestigation, getRouteOptions("post"));
+const closeInvestigation = route("close-investigation", CloseInvestigation, getRouteOptions("post"));
+
+/**
+ * Add org to an Investigation
+ */
+const addOrgToInvestigation = route("add-org-investigation", AddOrganisationToInvestigation, getRouteOptions("post"));
 
 /**
  * Accept Investigation request
  */
-const acceptInvestigation = route('accept-investigation', AcceptInvestigation, getRouteOptions("post"));
+const acceptInvestigation = route("accept-investigation", AcceptInvestigation, getRouteOptions("post"));
 
 /**
  * Reject Investigation request
  */
-const rejectInvestigation = route('reject-investigation', RejectInvestigation, getRouteOptions("post"));
+const rejectInvestigation = route("reject-investigation", RejectInvestigation, getRouteOptions("post"));
 
 /**
  * add serial number customer Investigation request
  */
-const addSerialNumberCustomer = route('add-serialNumberCustomer', AddSerialNumberCustomerToInvestigation, getRouteOptions("post"));
+const addSerialNumberCustomer = route("add-serialNumberCustomer", AddSerialNumberCustomerToInvestigation, getRouteOptions("post"));
 
 /**
  * create an Investigation
  */
-const getAllInvestigations = route('get-all-investigations', GetAllInvestigations, getRouteOptions("get"));
+const getAllInvestigations = route("get-all-investigations", GetAllInvestigations, getRouteOptions("get"));
 
 /**
  * get public Investigation details
  */
-const getPublicInvestigations = route('get-public-investigations', GetPublicInvestigationDetails, getRouteOptions("get"));
+const getPublicInvestigations = route("get-public-investigations", GetPublicInvestigationDetails, getRouteOptions("get"));
 
 /**
  * Smart Contract API router
  * @export object
  */
 export default {
-    pathPrefix: `v1/investigation`,
-    data: [
-        createInvestigation,
-        addOrgToInvestigation,
-        acceptInvestigation,
-        rejectInvestigation,
-        getAllInvestigations,
-        getPublicInvestigations,
-        addSerialNumberCustomer
-    ]
-}
+	pathPrefix: `v1/investigation`,
+	data: [
+		createInvestigation,
+		closeInvestigation,
+		addOrgToInvestigation,
+		acceptInvestigation,
+		rejectInvestigation,
+		getAllInvestigations,
+		getPublicInvestigations,
+		addSerialNumberCustomer
+	]
+};

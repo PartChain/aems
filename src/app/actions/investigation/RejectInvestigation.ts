@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-import JWT from './../../modules/jwt/JWT';
-import Response from '../../modules/response/Response';
+import JWT from "./../../modules/jwt/JWT";
+import Response from "../../modules/response/Response";
 import InvestigationClient from "../../domains/InvestigationClient";
-import {InvestigationStatus} from '../../enums/InvestigationStatus'
+import { InvestigationStatus } from "../../enums/InvestigationStatus";
+import Logger from "../../modules/logger/Logger";
 
 /**
  * Reject investigation
@@ -27,24 +28,20 @@ import {InvestigationStatus} from '../../enums/InvestigationStatus'
  * @constructor
  */
 export default async function RejectInvestigation(req: any, res: any, next: any) {
-    const client = new InvestigationClient();
-    const jwt = JWT.parseFromHeader(
-        req.header('Authorization')
-    );
-    
-    await  client.processBodyForInvestigationID(req.body);
-    const {investigationID} = req.body;
-    return await client.updateInvestigationStatus(
-        investigationID,
-        InvestigationStatus.REJECTED,
-        JWT.parseMspIDFromToken(jwt)
-    ).then(
-        (response: any) => {
-            Response.json(res, response, 200);
-        }
-    ).catch(
-        (error: any) => Response.json(res, Response.errorPayload(error), Response.errorStatusCode(error))
-    );
+	const client = new InvestigationClient();
+	const jwt = JWT.parseFromHeader(req.header("Authorization"));
+
+	// validate the payload
+	if (!req.body.hasOwnProperty("investigationID")) {
+		return Response.json(res, Response.errorPayload(`Request body is missing investigationID key`), 400);
+	}
+	const { investigationID } = req.body;
+	return await client
+		.updateInvestigationStatus(investigationID, InvestigationStatus.REJECTED, JWT.parseMspIDFromToken(jwt))
+		.then((response: any) => {
+			Response.json(res, response, 200);
+		})
+		.catch((error: any) => Response.json(res, Response.errorPayload(error), Response.errorStatusCode(error)));
 }
 /**
  * @ignore

@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-import JWT from './../../modules/jwt/JWT';
-import Response from '../../modules/response/Response';
+import JWT from "./../../modules/jwt/JWT";
+import Response from "../../modules/response/Response";
 import InvestigationClient from "../../domains/InvestigationClient";
-
 /**
  * Request access for a mspID
  * @param req
@@ -26,20 +25,27 @@ import InvestigationClient from "../../domains/InvestigationClient";
  * @constructor
  */
 export default async function CreateInvestigation(req: any, res: any, next: any) {
-    const client = new InvestigationClient();
-    const jwt = JWT.parseFromHeader(
-        req.header('Authorization')
-    );
-    return await client.createInvestigation(
-        req.body,
-        JWT.parseMspIDFromToken(jwt)
-    ).then(
-        (response: any) => {
-            Response.json(res, response, 200);
-        }
-    ).catch(
-        (error: any) => Response.json(res, Response.errorPayload(error), Response.errorStatusCode(error))
-    );
+	const client = new InvestigationClient();
+
+	if (!req.body.hasOwnProperty("title")) {
+		return Response.json(res, Response.errorPayload(`Request body is missing title key`), 400);
+	}
+	if (!req.body.hasOwnProperty("description")) {
+		req.body["description"] = "Default description";
+	}
+	if (!req.body.hasOwnProperty("type")) {
+		req.body["type"] = "RECALL";
+	}
+
+	const jwt = JWT.parseFromHeader(req.header("Authorization"));
+
+	const { description, title, type } = req.body;
+	return await client
+		.createInvestigation(description, title, type, JWT.parseMspIDFromToken(jwt))
+		.then((response: any) => {
+			Response.json(res, response, 200);
+		})
+		.catch((error: any) => Response.json(res, Response.errorPayload(error), Response.errorStatusCode(error)));
 }
 /**
  * @ignore
@@ -52,6 +58,22 @@ export default async function CreateInvestigation(req: any, res: any, next: any)
  *     tags: ['investigation']
  *     produces:
  *       - application/json
+ *     parameters:
+ *       - name: description
+ *         description:
+ *         in: body
+ *         required: true
+ *         type: string
+ *       - name: title
+ *         description:
+ *         in: body
+ *         required: true
+ *         type: string
+ *       - name: type
+ *         description:
+ *         in: body
+ *         required: true
+ *         type: string
  *     responses:
  *       200:
  *         description: success

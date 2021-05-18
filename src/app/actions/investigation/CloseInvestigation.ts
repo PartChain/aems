@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-import JWT from './../../modules/jwt/JWT';
-import Response from '../../modules/response/Response';
+import JWT from "./../../modules/jwt/JWT";
+import Response from "../../modules/response/Response";
 import InvestigationClient from "../../domains/InvestigationClient";
-import {InvestigationStatus} from '../../enums/InvestigationStatus'
 
 /**
  * Close investigation //TODO implement this
@@ -27,26 +26,21 @@ import {InvestigationStatus} from '../../enums/InvestigationStatus'
  * @constructor
  */
 export default async function CloseInvestigation(req: any, res: any, next: any) {
-    const client = new InvestigationClient();
-    const jwt = JWT.parseFromHeader(
-        req.header('Authorization')
-    );
-    await  client.processBodyForInvestigationID(req.body);
-    const {investigationID} = JSON.parse(req.body)
-    // TO DO
-    /*
-    return await client.closeInvestigation(
-        investigationID,
-        InvestigationStatus.CLOSE,
-        JWT.parseMspIDFromToken(jwt)
-    ).then(
-        (response: any) => {
-            Response.json(res, response, 200)
-        }
-    ).catch(
-        (error: any) => Response.json(res, Response.errorPayload(error), Response.errorStatusCode(error))
-    );
-*/
+	const client = new InvestigationClient();
+	const jwt = JWT.parseFromHeader(req.header("Authorization"));
+	// validate payload
+
+	if (!req.body.hasOwnProperty("investigationID")) {
+		return Response.json(res, Response.errorPayload(`Request body is missing investigationID key`), 400);
+	}
+
+	const { investigationID } = req.body;
+	return await client
+		.closeInvestigation(investigationID, JWT.parseMspIDFromToken(jwt))
+		.then((response: any) => {
+			Response.json(res, response, 200);
+		})
+		.catch((error: any) => Response.json(res, Response.errorPayload(error), Response.errorStatusCode(error)));
 }
 /**
  * @ignore
@@ -55,23 +49,21 @@ export default async function CloseInvestigation(req: any, res: any, next: any) 
  *   post:
  *     security:
  *       - Bearer: []
- *     description: close investigation
+ *     description: Close investigation
  *     tags: ['investigation']
  *     produces:
  *       - application/json
  *     parameters:
- *       - name: Message
- *         description: Message specifying the description of the investigation
+ *       - name: investigationID
+ *         description:
  *         in: body
  *         required: true
- *         type: array
- *         schema:
- *           $ref: '#/definitions/ACLUpdateRequest'
+ *         type: string
  *     responses:
  *       200:
  *         description: success
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/definitions/ACL'
+ *               $ref: '#/definitions/Investigation'
  */

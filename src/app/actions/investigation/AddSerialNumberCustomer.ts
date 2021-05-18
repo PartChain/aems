@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-import JWT from './../../modules/jwt/JWT';
-import Response from '../../modules/response/Response';
+import JWT from "./../../modules/jwt/JWT";
+import Response from "../../modules/response/Response";
 import InvestigationClient from "../../domains/InvestigationClient";
 
 /**
@@ -26,28 +26,24 @@ import InvestigationClient from "../../domains/InvestigationClient";
  * @constructor
  */
 export default async function AddSerialNumberCustomerToInvestigation(req: any, res: any, next: any) {
-    const client = new InvestigationClient();
-    const jwt = JWT.parseFromHeader(
-        req.header('Authorization')
-    );
+	const client = new InvestigationClient();
+	const jwt = JWT.parseFromHeader(req.header("Authorization"));
 
-    // validate the payload
-    try {
-        await client.processBodyForAddingSerialNumberCustomerToInvestigationID(req.body);
-    } catch(error) {
-        Response.json(res, Response.errorPayload(error), Response.errorStatusCode(error))
-    };
-    return await client.addAssetsToInvestigation(
-        req.body.componentsSerialNumbers,
-        req.body.investigationID,
-        JWT.parseMspIDFromToken(jwt)
-    ).then(
-        (response: any) => {
-            Response.json(res, response, 200);
-        }
-    ).catch(
-        (error: any) => Response.json(res, Response.errorPayload(error), Response.errorStatusCode(error))
-    );
+	if (!req.body.hasOwnProperty("investigationID")) {
+		return Response.json(res, Response.errorPayload(`Request body is missing investigationID  key`), 400);
+	}
+
+	if (!req.body.hasOwnProperty("componentsSerialNumbers")) {
+		return Response.json(res, Response.errorPayload(`Request body is missing componentsSerialNumbers key`), 400);
+	}
+
+	const { investigationID, componentsSerialNumbers } = req.body;
+	return await client
+		.addAssetsToInvestigation(investigationID, componentsSerialNumbers, JWT.parseMspIDFromToken(jwt))
+		.then((response: any) => {
+			Response.json(res, response, 200);
+		})
+		.catch((error: any) => Response.json(res, Response.errorPayload(error), Response.errorStatusCode(error)));
 }
 /**
  * @ignore

@@ -255,18 +255,35 @@
  *       comment:
  *         type: string
  *
+ *   SuccessAndFailedArray:
+ *     type: object
+ *     properties:
+ *       successList:
+ *         type: array
+ *         items:
+ *           type: string
+ *       failedList:
+ *         type: array
+ *         items:
+ *           type: string
+ *
+ *
  *   Investigation:
  *     type: object
  *     properties:
  *       creator:
  *         type: string
- *       comment:
+ *       description:
+ *         type: string
+ *       title:
  *         type: string
  *       investigationID:
  *         type: string
- *       message:
+ *       timestamp:
  *         type: string
  *       status:
+ *         type: string
+ *       type:
  *         type: string
  *       entities:
  *         type: array
@@ -292,5 +309,5 @@
  *   InvestigationArray:
  *     type: array
  *     items:
- *       $ref: '#/definitions/TransactionInput'
+ *       $ref: '#/definitions/Investigation'
  */

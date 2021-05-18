@@ -14,11 +14,9 @@
  * limitations under the License.
  */
 
-import JWT from './../../modules/jwt/JWT';
-import Response from '../../modules/response/Response';
+import JWT from "./../../modules/jwt/JWT";
+import Response from "../../modules/response/Response";
 import InvestigationClient from "../../domains/InvestigationClient";
-import Logger from '../../modules/logger/Logger';
-
 
 /**
  * Get Public investigation  details
@@ -28,28 +26,19 @@ import Logger from '../../modules/logger/Logger';
  * @constructor
  */
 export default async function GetPublicInvestigationDetails(req: any, res: any, next: any) {
-    const client = new InvestigationClient();
-    const jwt = JWT.parseFromHeader(
-        req.header('Authorization')
-    );
-    // validate the payload
-    try{
-        Logger.info(`Query params = ${JSON.stringify(req.query)}`);
-        await client.processBodyForInvestigationID(req.query);
-    }catch(error){
-        Response.json(res, Response.errorPayload(error), Response.errorStatusCode(error))
-    };
-    const { investigationID } = req.query;
-    return await Response.processResponse(await client.getPublicInvestigationDetails(
-        investigationID,
-        JWT.parseMspIDFromToken(jwt)
-    )).then(
-        (response: any) => {
-            Response.json(res, response, 200);
-        }
-    ).catch(
-        (error: any) => Response.json(res, Response.errorPayload(error), Response.errorStatusCode(error))
-    );
+	const client = new InvestigationClient();
+	const jwt = JWT.parseFromHeader(req.header("Authorization"));
+
+	// Validate input parameter
+	if (!req.query.hasOwnProperty("investigationID")) {
+		return Response.json(res, Response.errorPayload(`Request query is missing investigationID key`), 400);
+	}
+	const { investigationID } = req.query;
+	return await Response.processResponse(await client.getPublicInvestigationDetails(investigationID, JWT.parseMspIDFromToken(jwt)))
+		.then((response: any) => {
+			Response.json(res, response, 200);
+		})
+		.catch((error: any) => Response.json(res, Response.errorPayload(error), Response.errorStatusCode(error)));
 }
 /**
  * @ignore
@@ -64,7 +53,7 @@ export default async function GetPublicInvestigationDetails(req: any, res: any, 
  *       - application/json
  *     parameters:
  *       - name: investigationID
- *         description: investigationID 
+ *         description: investigationID
  *         in: query
  *         required: true
  *         type: string

@@ -26,7 +26,7 @@ import SmartContractAPI from "./app/routes/SmartContractAPI";
 import TransactionAPI from "./app/routes/TransactionAPI";
 import AccessMgmtAPI from "./app/routes/AccessMgmtAPI";
 import AccessMgmtClient from "./app/domains/AccessMgmtClient";
-import KafkaConsumer from "./app/modules/kafka-consumer/kafkaConsumer";
+import KafkaConsumer from "./app/modules/kafka/kafkaConsumer";
 import defaults from "./app/defaults";
 import InvestigationAPI from "./app/routes/InvestigationAPI";
 

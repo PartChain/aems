@@ -21,20 +21,28 @@ import SmartContractClient from "../../domains/SmartContractClient";
 import GatewaySingleton from "../gateway/GatewaySingleton";
 import {BadRequestError, DeploymentError, FabricError} from "../error/CustomErrors";
 import {UniqueConstraintError} from 'sequelize'
+import FailedIngestStats from "../../interfaces/FailedIngestStats";
+import IngestStats from "../../interfaces/IngestStats";
 
-
+/**
+ * Class that instantiates a kafka consumer to ingest assets to the Fabric system by picking up the assets from the
+ * according kafka topics. The kafka topics are filled by the DIS. Stats about successful or failed ingests are sent back
+ * to a kafka topic for further evaluation
+ * @class
+ */
 export default class KafkaConsumer {
     private kafka: Kafka;
     private consumer: any;
+    private producer: any;
     private readonly logger: any
 
 
     constructor() {
 
         this.logger = (log: any) => {
-            return ({ namespace, level, label, log }: any) => {
-                const { message, ...extra } = log;
-                switch (level){
+            return ({namespace, level, label, log}: any) => {
+                const {message, ...extra} = log;
+                switch (level) {
                     case logLevel.INFO:
                         Logger.info(`[KAFKA] ${message}`);
                         break;
@@ -60,14 +68,16 @@ export default class KafkaConsumer {
             brokers: [`${defaults.kafka.host}:${defaults.kafka.port}`],
             clientId: 'AEMS-client',
         });
-        this.consumer = this.kafka.consumer({ groupId: defaults.kafka.groupId });
+        this.consumer = this.kafka.consumer({groupId: defaults.kafka.groupId});
+        this.producer = this.kafka.producer();
 
 
     }
 
-    async consume(){
+    async consume() {
         const client = new SmartContractClient();
         await this.consumer.connect();
+        await this.producer.connect();
 
         // Get all relevant mspIDs from identities and subscribe to their topics  assets.[realm name in lower case].topic
         const gatewaySingleton: GatewaySingleton = await GatewaySingleton.getInstance();
@@ -80,15 +90,14 @@ export default class KafkaConsumer {
 
         for (let identity of Object.keys(hlfIdentities)) {
             const mspID: string = hlfIdentities[identity]["HLF_IDENTITY_MSP_ID"];
-            if(!topics.includes(mspID)){
+            if (!topics.includes(mspID)) {
                 // await admin.createTopics({ topics: [{topic: mspID}] }) // We don`t to create topics in aems
                 // Logger.info(`[KAFKA] Created topic ${mspID} since it did not exist yet`);
                 Logger.error(`[KAFKA] Topic ${mspID} does not exist!`);
-            }
-            else{
+            } else {
                 Logger.info(`[KAFKA] Subscribing to topic ${mspID}`);
                 const topic = `${mspID}`;
-                await this.consumer.subscribe({topic}); // think about , fromBeginning: true
+                await this.consumer.subscribe({topic}); // In case of replay add , fromBeginning: true
                 Logger.info(`[KAFKA] Most recent offset for topic ${topic} ${JSON.stringify(await admin.fetchTopicOffsets(topic))}`);
             }
         }
@@ -97,41 +106,73 @@ export default class KafkaConsumer {
         Logger.info(`[KAFKA] Group description: ${JSON.stringify(await this.consumer.describeGroup())}`);
 
         this.consumer.run({
-            eachMessage: async ({ topic, partition, message }: any) => {
+            eachMessage: async ({topic, partition, message}: any) => {
                 const prefix = `${topic}[${partition} | ${message.offset}] / ${message.timestamp}`
                 const asset: any = JSON.parse(message.value.toString());
                 Logger.debug(`[KAFKA] - ${prefix} ${message.key}#${JSON.stringify(asset)}`);
-                try{
+                try {
                     const response = await client.upsertAsset(asset, topic);
-                    switch (true){
+                    switch (true) {
                         case (response.status >= 200 && response.status < 300):
                             Logger.info(`[KAFKA] [${topic}] Successfully stored asset ${asset.serialNumberCustomer} from topic ${topic}`);
+                            const ingestStatsMessage: IngestStats = {
+                                mspId: topic,
+                                requestDate: asset.requestDate,
+                                requestProcessId: asset.requestProcessId,
+                                serialNumberCustomer: asset.serialNumberCustomer,
+                                ingestDate: String(new Date().getTime())
+                            };
+                            this.producer
+                                .send({
+                                    topic: defaults.kafka.ingestStatsTopicName,
+                                    messages: [
+                                        {value: JSON.stringify(ingestStatsMessage)}
+                                    ],
+                                })
+                                .then((r: any) => Logger.debug(`[KAFKA] Send message ${JSON.stringify(ingestStatsMessage)} successfully to ingest stats topic: ${JSON.stringify(r)}`))
+                                .catch((e: { message: any; }) => Logger.error(`[KAFKA] Problem when sending asset to ingest stats topic: ${JSON.stringify(e)}`));
                             break;
                         case (response.status >= 400 && response.status < 500):
                             // In this case there was something wrong with the assets, therefore we do not retry it
-                            Logger.error(`[KAFKA] [${topic}] Problem when calling storeAsset ${JSON.stringify(response)} with ${JSON.stringify(asset)}`);
                             throw new BadRequestError(`[KAFKA] [${topic}] Problem when calling storeAsset ${JSON.stringify(response)}`);
                         default:
                             // Something is wrong with the environment, we will retry later
-                            Logger.error(`[KAFKA] [${topic}] Problem when calling storeAsset ${JSON.stringify(response)} with ${JSON.stringify(asset)}`);
                             throw new FabricError(`[KAFKA] [${topic}] Problem when calling storeAsset ${JSON.stringify(response)}`);
 
 
                     }
 
-                }
-                catch (e) {
+                } catch (e) {
                     switch (e.constructor) {
                         case UniqueConstraintError:
                         case BadRequestError:
                             Logger.error(`[KAFKA] [${topic}] Problem when calling storeAsset ${JSON.stringify(e)} with ${JSON.stringify(asset)}`);
                             // In this we do not retry the store the asset since the failure was caused by a missconfigured message
+                            // Send error message to Dead Letter Queue
+                            const failedIngestStatsMessage: FailedIngestStats = {
+                                mspId: topic,
+                                sourceService: 'AEMS',
+                                jsonRequestAsset: asset,
+                                requestDate: asset.requestDate,
+                                requestProcessId: asset.requestProcessId,
+                                warnings: [],
+                                failReasons: [e.message]
+                            };
+                            this.producer
+                                .send({
+                                    topic: defaults.kafka.failedIngestStatsTopicName,
+                                    messages: [
+                                        {value: JSON.stringify(failedIngestStatsMessage)}
+                                    ],
+                                })
+                                .then((r: any) => Logger.info(`[KAFKA] Send message ${JSON.stringify(failedIngestStatsMessage)} successfully to failed ingest topic: ${JSON.stringify(r)}`))
+                                .catch((e: { message: any; }) => Logger.error(`[KAFKA] Problem when sending asset to failed ingest topic: ${JSON.stringify(e)}`));
                             break;
                         case DeploymentError:
                         case FabricError:
                         default:
                             // The default should be to retry the storeAsset
-                            Logger.error(`[KAFKA] [${topic}] Problem when calling storeAsset ${JSON.stringify(e)} with ${JSON.stringify(asset)}.`+
+                            Logger.error(`[KAFKA] [${topic}] Problem when calling storeAsset ${JSON.stringify(e)} with ${JSON.stringify(asset)}.` +
                                 `Problem with asset was not due to the properties of the asset, therefore we will retry to store this asset.`);
                             throw e
                     }
@@ -144,31 +185,32 @@ export default class KafkaConsumer {
         //const errorTypes = ['unhandledRejection', 'uncaughtException'];
         const signalTraps = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
 
-/*        errorTypes.map(type => { //TODO Think about this
-            process.on(type, async e => {
-                try {
-                    Logger.info(`process.on ${type}`);
-                    Logger.error(e);
-                    await this.consumer.disconnect();
-                    process.exit(0);
-                } catch (_) {
-                    process.exit(1);
-                }
-            })
-        });*/
+        /*        errorTypes.map(type => { //TODO Think about this
+                    process.on(type, async e => {
+                        try {
+                            Logger.info(`process.on ${type}`);
+                            Logger.error(e);
+                            await this.consumer.disconnect();
+                            await this.producer.disconnect();
+                            process.exit(0);
+                        } catch (_) {
+                            process.exit(1);
+                        }
+                    })
+                });*/
 
         signalTraps.map(type => {
             // @ts-ignore
             process.once(type, async () => {
                 try {
-                    Logger.info(`[KAFKA] Disconnecting Consumer`);
+                    Logger.info(`[KAFKA] Disconnecting Consumer and Producer`);
                     await this.consumer.disconnect();
+                    await this.producer.disconnect();
                 } finally {
                     process.kill(process.pid, type);
                 }
             })
         });
-
 
 
     }

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-import JWT from './../../modules/jwt/JWT';
-import Response from '../../modules/response/Response';
+import JWT from "./../../modules/jwt/JWT";
+import Response from "../../modules/response/Response";
 import InvestigationClient from "../../domains/InvestigationClient";
 
 /**
@@ -26,27 +26,28 @@ import InvestigationClient from "../../domains/InvestigationClient";
  * @constructor
  */
 export default async function AddOrganisationToInvestigation(req: any, res: any, next: any) {
-    const client = new InvestigationClient();
-    const jwt = JWT.parseFromHeader(
-        req.header('Authorization')
-    );
+	const client = new InvestigationClient();
+	const jwt = JWT.parseFromHeader(req.header("Authorization"));
 
-    // validate the payload
-    try {
-        await client.processBodyForAddingOrgToInvestigationID(req.body);
-    } catch (error) {
-        Response.json(res, Response.errorPayload(error), Response.errorStatusCode(error))
-    };
-    return await client.addOrganisationToInvestigation(
-        req.body,
-        JWT.parseMspIDFromToken(jwt)
-    ).then(
-        (response: any) => {
-            Response.json(res, response, 200);
-        }
-    ).catch(
-        (error: any) => Response.json(res, Response.errorPayload(error), Response.errorStatusCode(error))
-    );
+	if (!req.body.hasOwnProperty("investigationID")) {
+		return Response.json(res, Response.errorPayload(`Request body is missing investigationID key`), 400);
+	}
+
+	if (!req.body.hasOwnProperty("participatingOrgs")) {
+		return Response.json(res, Response.errorPayload(`Request  body is missing participatingOrgs key`), 400);
+	}
+
+	if (req.body.participatingOrgs.length == 0) {
+		return Response.json(res, Response.errorPayload(`ParticipatingOrgs length must be minimum 1`), 400);
+	}
+	const { investigationID, participatingOrgs } = req.body;
+
+	return await client
+		.addOrganisationToInvestigation(investigationID, participatingOrgs, JWT.parseMspIDFromToken(jwt))
+		.then((response: any) => {
+			Response.json(res, response, 200);
+		})
+		.catch((error: any) => Response.json(res, Response.errorPayload(error), Response.errorStatusCode(error)));
 }
 /**
  * @ignore
@@ -55,7 +56,7 @@ export default async function AddOrganisationToInvestigation(req: any, res: any,
  *   post:
  *     security:
  *       - Bearer: []
- *     description: adds a new organisation to the investigation
+ *     description: adds a new organization to the investigation
  *     tags: ['investigation']
  *     produces:
  *       - application/json
@@ -65,16 +66,16 @@ export default async function AddOrganisationToInvestigation(req: any, res: any,
  *         in: body
  *         required: true
  *         type: string
- *       - name: targetOrg
- *         description: targetOrg
+ *       - name: participatingOrgs
+ *         description: initial participatingOrgs for investigation
  *         in: body
  *         required: true
- *         type: string
+ *         type: array
  *     responses:
  *       200:
  *         description: success
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/definitions/Investigation'
+ *               $ref: '#/definitions/SuccessAndFailedArray'
  */
