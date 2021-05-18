@@ -11,7 +11,11 @@
 		"test": "npx jest",
 		"docs": "./node_modules/.bin/typedoc --out docs ./src"
 	},
-	"license": "Apache 2.0",
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/PartChain/aems"
+	},
 	"dependencies": {
 		"body-parser": "^1.19.0",
 		"cluster": "^0.7.7",
@@ -31,7 +35,7 @@
 		"kafkajs": "^1.15.0",
 		"keycloak-connect": "12.0.1",
 		"keycloak-connect-multirealm": "^2.1.0",
-		"lodash": "^4.17.20",
+		"lodash": "^4.17.21",
 		"log4js": "^6.3.0",
 		"monocle-ts": "^2.3.3",
 		"newtype-ts": "^0.3.4",
